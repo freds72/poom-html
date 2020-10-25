@@ -4,11 +4,11 @@
 
 // Name of your JavaScript file.
 // This is the file exported by PICO-8 upon running the `export <your game name>.html` command.
-const ScriptName = "jelpi.js";
+const ScriptName = "game.js";
 
 // Display name of cart.
 // This is used in the "Add <game> to Home Screen" button.
-const CartName = "Jelpi";
+const CartName = "POOM";
 
 /**
  * PICO-8 globals.
@@ -169,15 +169,14 @@ function GameShell({ canvasIdentifier }) {
           flex: 1,
           alignSelf: "stretch",
           display: "flex",
-          flexDirection: "column",
+          flexDirection: "column-reverse",
           alignItems: "center",
           justifyContent: "space-between",
           paddingTop: 32,
           paddingBottom: 40
         }}
       >
-        <img alt="pico8" src="./images/pico8_logo_vector.png" width={100} />
-        <AnalogStick areaRadius={50} threshold={30} stickRadius={20} isPortrait={isPortrait} />
+        <AnalogStick areaRadius={50} threshold={30} stickRadius={20} isPortrait={isPortrait} buttonId={1} />
       </div>
       <div
         style={{
@@ -278,35 +277,17 @@ function GameShell({ canvasIdentifier }) {
         </div>
         <div
           style={{
+            flex: 1,
+            alignSelf: "stretch",
             display: "flex",
-            justifyContent: "center",
-            position: "relative",
-            top: -30
+            flexDirection: "column-reverse",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingTop: 32,
+            paddingBottom: 0
           }}
         >
-          <XButton
-            isPressed={isXPressed}
-            setPressed={isXPressedNow => {
-              pico8_buttons[0] = updateXButton(pico8_buttons[0], isXPressedNow);
-              setXPressed(isXPressedNow);
-            }}
-            style={{
-              position: "relative",
-              top: 20
-            }}
-            isPortrait={isPortrait}
-          />
-          <OButton
-            isPressed={isOPressed}
-            setPressed={isOPressedNow => {
-              pico8_buttons[0] = updateOButton(pico8_buttons[0], isOPressedNow);
-              setOPressed(isOPressedNow);
-            }}
-            style={{
-              marginLeft: 10
-            }}
-            isPortrait={isPortrait}
-          />
+          <AnalogStick areaRadius={50} threshold={30} stickRadius={20} isPortrait={isPortrait} buttonId={0} />
         </div>
       </div>
       {gameState !== GameState.Active && (
@@ -582,7 +563,8 @@ function FullscreenMenu({ isFullscreenOn, setFullscreenOn, style }) {
 // areaRadius defines the radius (in pixels) of the analog stick's area.
 // threshold defines the threshold radius (in pixels) at which a direction button becomes pressed.
 // stickRadius defines the display radius (in pixels) of stick itself.
-function AnalogStick({ areaRadius, threshold, stickRadius, isPortrait }) {
+// buttonId defines the pico8 target input 
+function AnalogStick({ areaRadius, threshold, stickRadius, isPortrait, buttonId }) {
   if (!areaRadius)
     throw new Error(`<AnalogStick /> requires an areaRadius property.`);
   if (!threshold)
@@ -642,14 +624,14 @@ function AnalogStick({ areaRadius, threshold, stickRadius, isPortrait }) {
 
     // Update PICO-8 global state.
     if (isThresholdExceeded) {
-      pico8_buttons[0] = updateDirectionPad(pico8_buttons[0], {
+      pico8_buttons[buttonId] = updateDirectionPad(pico8_buttons[buttonId], {
         left: isLeft,
         right: isRight,
         up: isUp,
         down: isDown
       });
     } else {
-      pico8_buttons[0] = updateDirectionPad(pico8_buttons[0], {
+      pico8_buttons[buttonId] = updateDirectionPad(pico8_buttons[buttonId], {
         left: false,
         right: false,
         up: false,
@@ -678,7 +660,7 @@ function AnalogStick({ areaRadius, threshold, stickRadius, isPortrait }) {
         setAnalogStickY(areaRadius);
 
         // Update PICO-8 global state.
-        pico8_buttons[0] = updateDirectionPad(pico8_buttons[0], {
+        pico8_buttons[buttonId] = updateDirectionPad(pico8_buttons[buttonId], {
           left: false,
           right: false,
           up: false,

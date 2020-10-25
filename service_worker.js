@@ -10,7 +10,7 @@ const FilesToCache = [
   "/app.js",
   "/index.html",
   "/app.css",
-  "/jelpi.js",
+  "/game.js",
   "/manifest.json",
   "/images/icon_128x128.png",
   "/images/icon_144x144.png",
