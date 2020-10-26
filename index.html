@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
 
     <!-- May need "user-scalable=no". -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <!-- Metadata for iOS. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -39,17 +39,29 @@
     <!-- Your app. -->
     <script type="text/babel" src="./app.js"></script>
 
-    <!-- Catches arrow key events to avoid scrolling the browser page -->
     <script>
+      // See https://stackoverflow.com/a/38573198/1112407 for context about
+      // hacks below.
+
+      // Prevent pinch-to-zoom on iOS.
       document.addEventListener('touchmove', function (event) {
         if (event.scale !== 1) { event.preventDefault(); }
-      }, 
-      { passive: false });
-      window.addEventListener("keydown", function(e) {
-       if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
-       e.preventDefault();
-       }
-      }, false);
+      }, { passive: false });
+
+      // Prevent double-tap-to-zoom on iOS.
+      var lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        var now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, { passive: false });
+
+      // Catch arrow key events to avoid scrolling the browser page.
+      document.addEventListener("keydown", function(e) {
+        if ([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) { e.preventDefault(); }
+      }, { passive: false });
     </script>
   </body>
 </html>
