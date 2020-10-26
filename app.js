@@ -259,7 +259,6 @@ function GameShell({ canvasIdentifier }) {
             isMenuOn={isMenuOn}
             setMenuOn={isMenuOnNow => {
               if (gameState !== GameState.Active) return;
-              Module.pico8TogglePaused(isMenuOnNow);
               setMenuOn(isMenuOnNow);
             }}
             isPortrait={isPortrait}
@@ -287,7 +286,7 @@ function GameShell({ canvasIdentifier }) {
             paddingBottom: 0
           }}
         >
-          <AnalogStick areaRadius={50} threshold={30} stickRadius={20} isPortrait={isPortrait} buttonId={0} />
+          <MagicStick areaRadius={50} threshold={30} stickRadius={20} isPortrait={isPortrait} buttonId={0} />
         </div>
       </div>
       {gameState !== GameState.Active && (
@@ -451,7 +450,7 @@ function HamburgerMenu({ isMenuOn, setMenuOn, isPortrait, style }) {
         ...style
       }}
       onClick={() => {
-        setMenuOn(!isMenuOn);
+        pico8_buttons[0] = updatePause(pico8_buttons[0],!isMenuOn);
       }}
     >
       <div
@@ -685,6 +684,152 @@ function AnalogStick({ areaRadius, threshold, stickRadius, isPortrait, buttonId 
   return null;
 }
 
+// turn+fire+open all-in-one stick
+function MagicStick({ areaRadius, threshold, stickRadius, isPortrait, buttonId }) {
+  if (!areaRadius)
+    throw new Error(`<AnalogStick /> requires an areaRadius property.`);
+  if (!threshold)
+    throw new Error(`<AnalogStick /> requires a threshold property.`);
+  if (!stickRadius)
+    throw new Error(`<AnalogStick /> requires a stickRadius property.`);
+
+  const divRef = React.createRef();
+
+  // Note that these xy-coordinates are relative to the top-left of the analog stick area.
+  // Example:
+  //
+  //   +-------
+  //   | (x,y)
+  //   |
+  const [analogStickX, setAnalogStickX] = React.useState(areaRadius);
+  const [analogStickY, setAnalogStickY] = React.useState(areaRadius);
+
+  const handleMove = e => {
+    // Extract fields from touch event.
+    const { left, top } = divRef.current.getBoundingClientRect();
+    const touchObj = extractRelevantFields(e.changedTouches[0]);
+
+    // Determine X and Y when the origin is at the center of the analog stick area.
+    let x = touchObj.clientX - left - areaRadius;
+    let y = touchObj.clientY - top - areaRadius;
+
+    // Determine distance from center.
+    const dist = Math.sqrt(x ** 2 + y ** 2);
+
+    // Clamp analog stick to edge of analog stick area.
+    if (dist > areaRadius) {
+      x = (x / dist) * areaRadius;
+      y = (y / dist) * areaRadius;
+    }
+
+    // Update analog stick position.
+    setAnalogStickX(x + areaRadius);
+    setAnalogStickY(y + areaRadius);
+
+    // Determine if analog stick threshold is exceeded for D-pad emulation.
+    const isThresholdExceeded = dist > threshold;
+
+    // Rotate coordinate system clockwise by 45 degrees so we can determine the
+    // analog stick's quadrant.
+    //
+    //     |
+    // left| up
+    // ----+----
+    // down| right
+    //     |
+    const [rx, ry] = rotate([x, y]);
+    const isUp = rx >= 0 && ry <= 0;
+    const isLeft = rx < 0 && ry <= 0;
+    const isDown = rx < 0 && ry > 0;
+    const isRight = rx >= 0 && ry > 0;
+
+    // Update PICO-8 global state.
+    if (isThresholdExceeded) {
+      pico8_buttons[buttonId] = updateDirectionPad(pico8_buttons[buttonId], {
+        left: isLeft,
+        right: isRight
+      });
+      pico8_buttons[buttonId] = updateButtons(pico8_buttons[buttonId], {
+        xDown: isUp,
+        oDown: isDown
+      });
+    }
+    else {
+      pico8_buttons[buttonId] = updateDirectionPad(pico8_buttons[buttonId], {
+        left: false,
+        right: false
+      });
+      pico8_buttons[buttonId] = updateButtons(pico8_buttons[buttonId], {
+        xDown: false,
+        oDown: false
+      });
+    }
+  };
+
+  if (useMobileDetect().isMobile() && !isPortrait) {
+  return (
+    <div
+      style={{
+        backgroundColor: "gray",
+        borderRadius: "25%",
+        width: areaRadius * 2,
+        height: areaRadius * 2,
+        position: "relative",
+        display:"flex",
+        flexDirection:"column",
+        justifyContent: "space-between"
+      }}
+      onContextMenu={e => e.preventDefault()}
+      ref={divRef}
+      onTouchStart={handleMove}
+      onTouchMove={handleMove}
+      onTouchEnd={e => {
+        // Reset analog stick to center of analog stick area.
+        setAnalogStickX(areaRadius);
+        setAnalogStickY(areaRadius);
+
+        // Update PICO-8 global state.
+        pico8_buttons[buttonId] = updateDirectionPad(pico8_buttons[buttonId], {
+          left: false,
+          right: false,
+          up: false,
+          down: false
+        });
+        pico8_buttons[buttonId] = updateButtons(pico8_buttons[buttonId], {
+          xDown: false,
+          oDown: false
+        });  
+      }}
+    >
+      <div style={{
+        backgroundColor:"red",
+        textAlign:"center",
+        height: areaRadius*2/3,
+        borderRadius:areaRadius*2/6
+      }}>fire</div>
+      <div style={{
+        backgroundColor:"green",
+        textAlign:"center",
+        height: areaRadius*2/3,
+        borderRadius:areaRadius*2/6
+      }}>open</div>
+      <div
+        style={{
+          backgroundColor: "lightgray",
+          width: stickRadius * 2,
+          height: stickRadius * 2,
+          left: analogStickX - stickRadius,
+          top: analogStickY - stickRadius,
+          position: "absolute",
+          borderRadius: "50%"
+        }}
+      />
+    </div>
+  );
+  }
+  return null;
+}
+
 const ButtonStyles = {
   width: 50,
   height: 50,
@@ -783,29 +928,33 @@ function updateDirectionPad(buttonState, { left, right, up, down }) {
   return otherButtons + directionPad;
 }
 
-// updateOButton returns a new button state, given the current state of the O button.
-function updateOButton(buttonState, isDown) {
+// updateButtons updates buttons
+function updateButtons(buttonState, {oDown, xDown}) {
   // Save current state of other buttons.
-  const otherButtons = buttonState & ~0x10;
+  const otherButtons = buttonState & ~(0x10 + 0x20);
 
   // Determine new O button state.
-  const oButton = isDown ? 0x10 : 0;
+  let buttons = 0;
+  if(oDown) buttons += 0x10;
+  if(xDown) buttons += 0x20;
 
   // Return updated state.
-  return otherButtons + oButton;
+  return otherButtons + buttons;
 }
 
-// updateXButton returns a new button state, given the current state of the X button.
-function updateXButton(buttonState, isDown) {
+function updatePause(buttonState, oClicked) {
   // Save current state of other buttons.
-  const otherButtons = buttonState & ~0x20;
+  const otherButtons = buttonState & ~(0x40);
 
-  // Determine new O button state.
-  const oButton = isDown ? 0x20 : 0;
+  // Determine new pause button state.
+  let buttons = 0;
+  if(oClicked) buttons += 0x40;
 
   // Return updated state.
-  return otherButtons + oButton;
+  return otherButtons + buttons;
 }
+
+
 
 // loadGameScript loads the JavaScript exported by PICO-8.
 async function loadGameScript(scriptName) {
